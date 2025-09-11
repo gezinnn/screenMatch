@@ -6,6 +6,8 @@ import br.com.alura.sreenchmatch.model.DadosTemporada;
 import br.com.alura.sreenchmatch.model.Episodio;
 import br.com.alura.sreenchmatch.service.ConsumoAPI;
 import br.com.alura.sreenchmatch.service.ConverteDados;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -14,6 +16,7 @@ import java.util.stream.Collectors;
 
 public class Main {
 
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
     private Scanner leitura = new Scanner(System.in);
     private final String ENDERECO = "https://www.omdbapi.com/?t=";
     private final String API_KEY = "&apiKey=" + System.getenv("API_KEY");
@@ -53,14 +56,20 @@ public class Main {
                 .collect(Collectors.toList());
 
         // Top 5 episódios mais bem avaliados
-        System.out.println("\n📌 Top 5 - Episódios Mais Bem Avaliados");
+        System.out.println("\n📌 Top 10 - Episódios Mais Bem Avaliados");
         dadosEpisodios.stream()
                 .filter(e -> e.avaliacao() != null && !e.avaliacao().equalsIgnoreCase("N/A"))
+                .peek(e -> System.out.println("Primeiro Filtro(N/A)" + e))
                 .sorted(Comparator.comparing(
                         e -> Double.valueOf(e.avaliacao()), Comparator.reverseOrder()
                 ))
-                .limit(5)
-                .forEach(this::exibirEpisodioFormatado);
+                .peek(e -> System.out.println("Ordenação" + e))
+                .limit(10)
+                .peek(e -> System.out.println("Limite" + e))
+                .map(e -> e.titulo().toUpperCase())
+                .peek(e -> System.out.println("Mapeamento" + e))
+
+                .forEach(System.out::println);
         System.out.println("----------------------------");
 
         // Converte para objetos de domínio Episodio
@@ -70,6 +79,22 @@ public class Main {
                 ).collect(Collectors.toList());
 
         episodios.forEach(System.out::println);
+
+
+        System.out.println("Digite um trecho do titulo do episodio: ");
+        var trechoTitulo = leitura.nextLine();
+
+        Optional<Episodio> episodioBuscado = episodios.stream()
+                .filter(e -> e.getTitulo().toUpperCase().contains(trechoTitulo.toUpperCase()))
+                .findFirst();
+
+        if (episodioBuscado.isPresent()) {
+            System.out.println("Episodio encontrado!");
+            System.out.println("Temporada: " + episodioBuscado.get().getTemporada());
+        } else {
+            System.out.println("Episodio não encontrado!");
+        }
+
 
         // Filtro por ano de lançamento
         System.out.println("\nA partir de que ano você deseja ver os episódios?");
@@ -92,9 +117,24 @@ public class Main {
                                 " | Episódio: " + e.getTitulo() +
                                 " | Data: " + e.getDataLancamento().format(formatter)
                 ));
-    }
 
-    private void exibirEpisodioFormatado(DadosEpisodio e) {
-        System.out.println("Título: " + e.titulo() + " | Avaliação: " + e.avaliacao());
+
+        Map<Integer, Double> avaliacoesPorTemporada = episodios.stream()
+                .filter(e -> e.getAvaliacao() > 0.0)
+                .collect(Collectors.groupingBy(Episodio::getTemporada,
+                        Collectors.averagingDouble(Episodio::getAvaliacao)));
+        System.out.println(avaliacoesPorTemporada);
+
+
+        DoubleSummaryStatistics est = episodios.stream()
+                .filter(e -> e.getAvaliacao() > 0.0)
+                .collect(Collectors.summarizingDouble(Episodio::getAvaliacao));
+
+
+        System.out.println("Média: " + est.getAverage());
+        System.out.println("Melhor Episódio: " + est.getMax());
+        System.out.println("Pior Episódio: " + est.getMin());
+        System.out.println("Quantidade de Episódios: " + est.getCount());
+
     }
 }
